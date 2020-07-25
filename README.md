@@ -36,7 +36,7 @@ kubectl run -it --rm benchmark-memory --image=benchmark --image-pull-policy IfNo
 ### Disk
 
 ```bash
-kubectl run -it --rm benchmark-disk --image=benchmark --image-pull-policy IfNotPresent -- fio --name=randwrite --iodepth=1 --rw=randwrite --bs=4m --size=256M --filename=/mounted/test
+kubectl run -it --rm benchmark-disk --image=benchmark --image-pull-policy IfNotPresent -- fio --name=randwrite --iodepth=1 --rw=randwrite --bs=4m --size=256M --filename=/tmp/test
 ```
 
 ### Network

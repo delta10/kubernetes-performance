@@ -8,3 +8,6 @@ RUN curl -s https://packagecloud.io/install/repositories/akopytov/sysbench/scrip
 RUN apt-get install -y sysbench fio iperf3
 
 RUN rm -rf /var/lib/apt/lists/*
+
+RUN useradd benchmark
+USER benchmark
