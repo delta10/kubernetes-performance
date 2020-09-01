@@ -17,23 +17,28 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
 var options struct {
+	Nodes        string `long:"nodes" default:"" description:"Restrict to a comma-separated list of nodes"`
 	Namespace    string `long:"namespace" default:"kubernetes-performance" description:"Namespace for the workload"`
 	KubeConfig   string `long:"kube-config" env:"KUBECONFIG" default:"" description:"The location of the Kubernetes configuration"`
-	Command      string `long:"command" default:"sysbench cpu run --time=30 --threads=4" description:"The command to execute"`
 	Cleanup      bool   `long:"cleanup" default:"false" description:"Cleanup pods after run"`
-	Pvc          bool   `long:"pvc" default:"" description:"Claim a persistent volume and mount to the pods"`
+	Pvc          bool   `long:"pvc" default:"false" description:"Claim a persistent volume and mount to the pods"`
 	StorageClass string `long:"storage-class" default:"standard" description:"Persistent volume storage class"`
+
+	Command         string `long:"command" default:"" description:"Run a specific benchmark command"`
+	SaturateCluster bool   `long:"saturate-cluster" default:"false" description:"Saturate the cluster with pods"`
+	Network         bool   `long:"network" default:"false" description:"Load test network"`
 }
 
-func main() {
-	var fsGroup = int64(1000)
+var fsGroup = int64(1000)
 
+func main() {
 	args, err := flags.Parse(&options)
 	if err != nil {
 		if et, ok := err.(*flags.Error); ok {
@@ -67,26 +72,47 @@ func main() {
 		panic(err.Error())
 	}
 
-	fmt.Printf("Nodes:\n")
-
+	var selectedNodes []string
 	for _, node := range nodes.Items {
-		fmt.Printf("%s\n", node.Name)
+		if options.Nodes == "" {
+			selectedNodes = append(selectedNodes, node.Name)
+		} else {
+			for _, selectedNode := range strings.Split(options.Nodes, ",") {
+				if node.Name == selectedNode {
+					selectedNodes = append(selectedNodes, node.Name)
+				}
+			}
+		}
 	}
 
-	fmt.Printf("\n")
+	fmt.Printf("Selected %d nodes\n", len(selectedNodes))
 
-	pods, err := clientset.CoreV1().Pods(options.Namespace).List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		panic(err.Error())
+	if options.Command != "" {
+		runCommandDistributed(clientset, selectedNodes)
 	}
 
-	fmt.Printf("There are %d pods in the namespace\n", len(pods.Items))
+	if options.SaturateCluster {
+		saturateCluster(clientset, selectedNodes)
+	}
 
-	for _, node := range nodes.Items {
+	if options.Network {
+		saturateNetwork(clientset, selectedNodes)
+	}
+}
+
+func homeDir() string {
+	if h := os.Getenv("HOME"); h != "" {
+		return h
+	}
+	return os.Getenv("USERPROFILE") // windows
+}
+
+func runCommandDistributed(clientset *kubernetes.Clientset, nodes []string) {
+	for _, node := range nodes {
 		if options.Pvc {
 			pvc := &apiv1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: fmt.Sprintf("kubernetes-performance-%s", node.Name),
+					Name: fmt.Sprintf("kubernetes-performance-%s", node),
 				},
 				Spec: apiv1.PersistentVolumeClaimSpec{
 					StorageClassName: &options.StorageClass,
@@ -107,10 +133,10 @@ func main() {
 
 		pod := &apiv1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("kubernetes-performance-%s", node.Name),
+				Name: fmt.Sprintf("kubernetes-performance-%s", node),
 			},
 			Spec: apiv1.PodSpec{
-				NodeName: node.Name,
+				NodeName: node,
 				SecurityContext: &apiv1.PodSecurityContext{
 					FSGroup: &fsGroup,
 				},
@@ -138,7 +164,7 @@ func main() {
 					Name: "pvc",
 					VolumeSource: apiv1.VolumeSource{
 						PersistentVolumeClaim: &apiv1.PersistentVolumeClaimVolumeSource{
-							ClaimName: fmt.Sprintf("kubernetes-performance-%s", node.Name),
+							ClaimName: fmt.Sprintf("kubernetes-performance-%s", node),
 						},
 					},
 				},
@@ -156,7 +182,7 @@ func main() {
 	fmt.Printf("Waiting for pods to complete...\n")
 
 	for {
-		pods, err = clientset.CoreV1().Pods(options.Namespace).List(context.TODO(), metav1.ListOptions{})
+		pods, err := clientset.CoreV1().Pods(options.Namespace).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			panic(err.Error())
 		}
@@ -176,7 +202,7 @@ func main() {
 		}
 	}
 
-	pods, err = clientset.CoreV1().Pods(options.Namespace).List(context.TODO(), metav1.ListOptions{})
+	pods, err := clientset.CoreV1().Pods(options.Namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		panic(err.Error())
 	}
@@ -224,9 +250,151 @@ func main() {
 	}
 }
 
-func homeDir() string {
-	if h := os.Getenv("HOME"); h != "" {
-		return h
+func saturateCluster(clientset *kubernetes.Clientset, nodes []string) {
+	fmt.Printf("Saturating cluster...")
+
+	for i := 1; i < 5*len(nodes); i++ {
+		pod := &apiv1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("kubernetes-performance-saturate-%d", i),
+			},
+			Spec: apiv1.PodSpec{
+				Containers: []apiv1.Container{
+					{
+						Name:  "pause",
+						Image: "k8s.gcr.io/pause:3.1",
+					},
+				},
+				RestartPolicy: apiv1.RestartPolicyNever,
+			},
+		}
+
+		_, err := clientset.CoreV1().Pods(options.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+		if err != nil {
+			panic(err.Error())
+		}
 	}
-	return os.Getenv("USERPROFILE") // windows
+
+	selector := fields.Set{
+		"involvedObject.kind": "Pod",
+		"source":              apiv1.DefaultSchedulerName,
+	}.AsSelector().String()
+
+	schedEvents, err := clientset.CoreV1().Events(options.Namespace).List(context.TODO(), metav1.ListOptions{FieldSelector: selector})
+	if err != nil {
+		panic(err.Error())
+	}
+
+	fmt.Printf("Found %d", len(schedEvents.Items))
+}
+
+func saturateNetwork(clientset *kubernetes.Clientset, nodes []string) {
+	if len(nodes) < 2 {
+		fmt.Printf("Cannot perform network load test. Require a minimum of two nodes.")
+		return
+	}
+
+	serverPod := &apiv1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kubernetes-performance-network-server",
+		},
+		Spec: apiv1.PodSpec{
+			NodeName: nodes[0],
+			Containers: []apiv1.Container{
+				{
+					Name:    "kubernetes-performance",
+					Image:   "registry.gitlab.com/delta10/kubernetes-performance:latest",
+					Command: []string{"iperf3", "-s"},
+				},
+			},
+			RestartPolicy: apiv1.RestartPolicyNever,
+		},
+	}
+
+	_, err := clientset.CoreV1().Pods(options.Namespace).Create(context.TODO(), serverPod, metav1.CreateOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+
+	fmt.Printf("Waiting for server to start...\n")
+
+	for {
+		serverPod, err = clientset.CoreV1().Pods(options.Namespace).Get(context.TODO(), serverPod.Name, metav1.GetOptions{})
+		if err != nil {
+			panic(err.Error())
+		}
+
+		if serverPod.Status.PodIP == "" {
+			fmt.Printf("Waiting for server to start...\n")
+			time.Sleep(5 * time.Second)
+		} else {
+			break
+		}
+	}
+
+	clientPod := &apiv1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kubernetes-performance-network-client",
+		},
+		Spec: apiv1.PodSpec{
+			NodeName: nodes[1],
+			Containers: []apiv1.Container{
+				{
+					Name:    "kubernetes-performance",
+					Image:   "registry.gitlab.com/delta10/kubernetes-performance:latest",
+					Command: []string{"iperf3", "-c", serverPod.Status.PodIP},
+				},
+			},
+			RestartPolicy: apiv1.RestartPolicyNever,
+		},
+	}
+
+	_, err = clientset.CoreV1().Pods(options.Namespace).Create(context.TODO(), clientPod, metav1.CreateOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+
+	fmt.Printf("Running performance test\n")
+
+	for {
+		clientPod, err = clientset.CoreV1().Pods(options.Namespace).Get(context.TODO(), clientPod.Name, metav1.GetOptions{})
+		if err != nil {
+			panic(err.Error())
+		}
+
+		if clientPod.Status.Phase == apiv1.PodPending || clientPod.Status.Phase == apiv1.PodRunning {
+			fmt.Printf("Waiting for test to finish...\n")
+			time.Sleep(5 * time.Second)
+		} else {
+			break
+		}
+	}
+
+	for _, pod := range []string{clientPod.Name, serverPod.Name} {
+		req := clientset.CoreV1().Pods(options.Namespace).GetLogs(pod, &apiv1.PodLogOptions{})
+		podLogs, err := req.Stream(context.TODO())
+		if err != nil {
+			panic(err.Error())
+		}
+		defer podLogs.Close()
+
+		logFile, err := os.Create(fmt.Sprintf("%s.log", pod))
+		if err != nil {
+			panic(err.Error())
+		}
+
+		defer logFile.Close()
+
+		_, err = io.Copy(logFile, podLogs)
+		if err != nil {
+			panic(err.Error())
+		}
+
+		if options.Cleanup {
+			err = clientset.CoreV1().Pods(options.Namespace).Delete(context.TODO(), pod, metav1.DeleteOptions{})
+			if err != nil {
+				panic(err.Error())
+			}
+		}
+	}
 }
