@@ -45,15 +45,11 @@ fio --name=randwrite --rw=randwrite --direct=1 --ioengine=libaio --bs=64k --numj
 Server
 
 ```bash
-kubectl run benchmark-network-server --image=benchmark --image-pull-policy IfNotPresent -- iperf3 -s
+iperf3 -s
 ```
 
 Client
 
 ```bash
-kubectl run -it --rm benchmark-network-client --image=benchmark --image-pull-policy IfNotPresent -- iperf3 -c $(kubectl get pod benchmark-network-server --template={{.status.podIP}})
-```
-
-```bash
-kubectl delete pod benchmark-network-server
+iperf3 -c {pod-ip}
 ```
