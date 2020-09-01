@@ -21,12 +21,12 @@ import (
 )
 
 var options struct {
-	Namespace  string `short:"n" long:"namespace" default:"kubernetes-performance" description:"Namespace for the workload"`
-	KubeConfig string `short:"c" long:"kube-config" env:"KUBECONFIG" default:"" description:"The location of the Kubernetes configuration"`
+	Namespace  string `long:"namespace" default:"kubernetes-performance" description:"Namespace for the workload"`
+	KubeConfig string `long:"kube-config" env:"KUBECONFIG" default:"" description:"The location of the Kubernetes configuration"`
+	Command    string `long:"command" default:"" description:"The command to execute"`
 }
 
 func main() {
-	// Parse options
 	args, err := flags.Parse(&options)
 	if err != nil {
 		if et, ok := err.(*flags.Error); ok {
@@ -36,6 +36,7 @@ func main() {
 		}
 		log.Fatalf("error parsing flags: %v", err)
 	}
+
 	if len(args) > 0 {
 		log.Fatalf("unexpected arguments: %v", args)
 	}
