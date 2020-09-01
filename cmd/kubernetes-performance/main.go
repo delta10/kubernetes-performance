@@ -30,6 +30,7 @@ var options struct {
 	Cleanup      bool   `long:"cleanup" default:"false" description:"Cleanup pods after run"`
 	Pvc          bool   `long:"pvc" default:"false" description:"Claim a persistent volume and mount to the pods"`
 	StorageClass string `long:"storage-class" default:"standard" description:"Persistent volume storage class"`
+	Pods         int    `long:"pods" default:"30" description:"Number of pods per node for saturation test"`
 
 	Command         string `long:"command" default:"" description:"Run a specific benchmark command"`
 	SaturateCluster bool   `long:"saturate-cluster" default:"false" description:"Saturate the cluster with pods"`
@@ -253,7 +254,7 @@ func runCommandDistributed(clientset *kubernetes.Clientset, nodes []string) {
 func saturateCluster(clientset *kubernetes.Clientset, nodes []string) {
 	fmt.Printf("Saturating cluster...")
 
-	for i := 1; i < 5*len(nodes); i++ {
+	for i := 1; i <= len(nodes)*options.Pods; i++ {
 		pod := &apiv1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("kubernetes-performance-saturate-%d", i),
@@ -261,7 +262,7 @@ func saturateCluster(clientset *kubernetes.Clientset, nodes []string) {
 			Spec: apiv1.PodSpec{
 				Containers: []apiv1.Container{
 					{
-						Name:  "pause",
+						Name:  fmt.Sprintf("kubernetes-performance-saturate-%d", i),
 						Image: "k8s.gcr.io/pause:3.1",
 					},
 				},
@@ -275,6 +276,30 @@ func saturateCluster(clientset *kubernetes.Clientset, nodes []string) {
 		}
 	}
 
+	var podsCompleted bool
+	fmt.Printf("Waiting for pods to run...\n")
+
+	for {
+		pods, err := clientset.CoreV1().Pods(options.Namespace).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			panic(err.Error())
+		}
+
+		podsCompleted = true
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == apiv1.PodPending {
+				podsCompleted = false
+			}
+		}
+
+		if podsCompleted == false {
+			fmt.Printf("Waiting for pods to run...\n")
+			time.Sleep(5 * time.Second)
+		} else {
+			break
+		}
+	}
+
 	selector := fields.Set{
 		"involvedObject.kind": "Pod",
 		"source":              apiv1.DefaultSchedulerName,
@@ -285,7 +310,16 @@ func saturateCluster(clientset *kubernetes.Clientset, nodes []string) {
 		panic(err.Error())
 	}
 
-	fmt.Printf("Found %d", len(schedEvents.Items))
+	fmt.Printf("Found %d events", len(schedEvents.Items))
+
+	if options.Cleanup {
+		for i := 1; i <= len(nodes)*options.Pods; i++ {
+			err := clientset.CoreV1().Pods(options.Namespace).Delete(context.TODO(), fmt.Sprintf("kubernetes-performance-saturate-%d", i), metav1.DeleteOptions{})
+			if err != nil {
+				panic(err.Error())
+			}
+		}
+	}
 }
 
 func saturateNetwork(clientset *kubernetes.Clientset, nodes []string) {
