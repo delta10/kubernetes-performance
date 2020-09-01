@@ -9,5 +9,7 @@ RUN apt-get install -y sysbench fio iperf3
 
 RUN rm -rf /var/lib/apt/lists/*
 
-RUN useradd benchmark
+RUN groupadd --gid=1000 benchmark
+RUN useradd --uid=1000 --gid=1000 benchmark
+
 USER benchmark

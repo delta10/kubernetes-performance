@@ -24,19 +24,20 @@ docker build -t benchmark -f benchmark/Dockerfile .
 ### CPU
 
 ```bash
-kubectl run -it --rm benchmark-cpu --image=benchmark --image-pull-policy IfNotPresent -- sysbench cpu run --time=10 --threads=1
+sysbench cpu run --time=30 --threads=4
 ```
 
 ### Memory
 
 ```bash
-kubectl run -it --rm benchmark-memory --image=benchmark --image-pull-policy IfNotPresent -- sysbench memory run --memory-block-size=1M --memory-total-size=4G --threads=1
+sysbench memory run --memory-block-size=1M --memory-total-size=4G --threads=4
 ```
 
 ### Disk
 
 ```bash
-kubectl run -it --rm benchmark-disk --image=benchmark --image-pull-policy IfNotPresent -- fio --name=randwrite --iodepth=1 --rw=randwrite --bs=4m --size=256M --filename=/tmp/test
+fio --name=randread --rw=randread --direct=1 --ioengine=libaio --bs=8k --numjobs=16 --size=1G --runtime=30 --group_reporting --filename=/tmp/test
+fio --name=randwrite --rw=randwrite --direct=1 --ioengine=libaio --bs=64k --numjobs=8 --size=512m --runtime=30 --group_reporting --filename=/tmp/test
 ```
 
 ### Network
