@@ -35,6 +35,7 @@ var options struct {
 	Command         string `long:"command" default:"" description:"Run a specific benchmark command"`
 	SaturateCluster bool   `long:"saturate-cluster" default:"false" description:"Saturate the cluster with pods"`
 	Network         bool   `long:"network" default:"false" description:"Load test network"`
+	NetworkTime     string `long:"network-time" default:"60" description:"Time of network load test"`
 }
 
 var fsGroup = int64(1000)
@@ -330,7 +331,7 @@ func saturateNetwork(clientset *kubernetes.Clientset, nodes []string) {
 
 	serverPod := &apiv1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "kubernetes-performance-network-server",
+			Name: fmt.Sprintf("kubernetes-performance-network-server-%s", nodes[0]),
 		},
 		Spec: apiv1.PodSpec{
 			NodeName: nodes[0],
@@ -368,7 +369,7 @@ func saturateNetwork(clientset *kubernetes.Clientset, nodes []string) {
 
 	clientPod := &apiv1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "kubernetes-performance-network-client",
+			Name: fmt.Sprintf("kubernetes-performance-network-client-%s", nodes[1]),
 		},
 		Spec: apiv1.PodSpec{
 			NodeName: nodes[1],
@@ -376,7 +377,7 @@ func saturateNetwork(clientset *kubernetes.Clientset, nodes []string) {
 				{
 					Name:    "kubernetes-performance",
 					Image:   "registry.gitlab.com/delta10/kubernetes-performance:latest",
-					Command: []string{"iperf3", "-c", serverPod.Status.PodIP},
+					Command: []string{"iperf3", "-c", serverPod.Status.PodIP, "-t", options.NetworkTime},
 				},
 			},
 			RestartPolicy: apiv1.RestartPolicyNever,

@@ -36,8 +36,10 @@ sysbench memory run --memory-block-size=1M --memory-total-size=4G --threads=4
 ### Disk
 
 ```bash
+fio --name=randrw --rw=randrw --direct=1 --ioengine=libaio --bs=4k --iodepth=256 --numjobs=4 --size=1G --runtime=30 --group_reporting --filename=/tmp/test
 fio --name=randread --rw=randread --direct=1 --ioengine=libaio --bs=8k --numjobs=16 --size=1G --runtime=30 --group_reporting --filename=/tmp/test
 fio --name=randwrite --rw=randwrite --direct=1 --ioengine=libaio --bs=64k --numjobs=8 --size=512m --runtime=30 --group_reporting --filename=/tmp/test
+fio --name=randrw --rw=randrw --direct=1 --ioengine=libaio --bs=4k --iodepth=256 --numjobs=4 --size=1G --runtime=30 --group_reporting --filename=/tmp/test
 ```
 
 ### Network
