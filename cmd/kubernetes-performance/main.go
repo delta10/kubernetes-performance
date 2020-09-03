@@ -5,8 +5,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,7 +19,6 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/tools/clientcmd"
@@ -30,12 +31,15 @@ var options struct {
 	Cleanup      bool   `long:"cleanup" default:"false" description:"Cleanup pods after run"`
 	Pvc          bool   `long:"pvc" default:"false" description:"Claim a persistent volume and mount to the pods"`
 	StorageClass string `long:"storage-class" default:"standard" description:"Persistent volume storage class"`
-	Pods         int    `long:"pods" default:"30" description:"Number of pods per node for saturation test"`
 
-	Command         string `long:"command" default:"" description:"Run a specific benchmark command"`
-	SaturateCluster bool   `long:"saturate-cluster" default:"false" description:"Saturate the cluster with pods"`
-	Network         bool   `long:"network" default:"false" description:"Load test network"`
-	NetworkTime     string `long:"network-time" default:"60" description:"Time of network load test"`
+	Command string `long:"command" default:"" description:"Run a specific benchmark command"`
+
+	SaturateCluster        bool `long:"saturate-cluster" default:"false" description:"Saturate the cluster"`
+	ReplicationControllers int  `long:"replication-controllers" default:"1" description:"Number of replication controllers for saturation test"`
+	Replicas               int  `long:"replicas" default:"30" description:"Number of replicas for saturation test"`
+
+	Network     bool   `long:"network" default:"false" description:"Load test network"`
+	NetworkTime string `long:"network-time" default:"60" description:"Time of network load test"`
 }
 
 var fsGroup = int64(1000)
@@ -94,7 +98,7 @@ func main() {
 	}
 
 	if options.SaturateCluster {
-		saturateCluster(clientset, selectedNodes)
+		saturateCluster(clientset)
 	}
 
 	if options.Network {
@@ -252,73 +256,100 @@ func runCommandDistributed(clientset *kubernetes.Clientset, nodes []string) {
 	}
 }
 
-func saturateCluster(clientset *kubernetes.Clientset, nodes []string) {
+func saturateCluster(clientset *kubernetes.Clientset) {
 	fmt.Printf("Saturating cluster...")
 
-	for i := 1; i <= len(nodes)*options.Pods; i++ {
-		pod := &apiv1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("kubernetes-performance-saturate-%d", i),
+	replicas := int32(options.Replicas)
+	userGuid := int64(1000)
+
+	replicationController := &apiv1.ReplicationController{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("kubernetes-performance-saturate"),
+		},
+		Spec: apiv1.ReplicationControllerSpec{
+			Replicas: &replicas,
+			Selector: map[string]string{
+				"app": "kubernetes-performance-saturate",
 			},
-			Spec: apiv1.PodSpec{
-				Containers: []apiv1.Container{
-					{
-						Name:  fmt.Sprintf("kubernetes-performance-saturate-%d", i),
-						Image: "k8s.gcr.io/pause:3.1",
+			Template: &apiv1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "kubernetes-performance-saturate",
+					Labels: map[string]string{
+						"app": "kubernetes-performance-saturate",
 					},
 				},
-				RestartPolicy: apiv1.RestartPolicyNever,
+				Spec: apiv1.PodSpec{
+					Containers: []apiv1.Container{
+						{
+							Name:  fmt.Sprintf("kubernetes-performance-saturate"),
+							Image: "k8s.gcr.io/pause:3.1",
+						},
+					},
+					SecurityContext: &apiv1.PodSecurityContext{
+						RunAsUser: &userGuid,
+					},
+				},
 			},
-		}
-
-		_, err := clientset.CoreV1().Pods(options.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
-		if err != nil {
-			panic(err.Error())
-		}
+		},
 	}
 
-	var podsCompleted bool
-	fmt.Printf("Waiting for pods to run...\n")
+	_, err := clientset.CoreV1().ReplicationControllers(options.Namespace).Create(context.TODO(), replicationController, metav1.CreateOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
 
 	for {
-		pods, err := clientset.CoreV1().Pods(options.Namespace).List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			panic(err.Error())
-		}
-
-		podsCompleted = true
-		for _, pod := range pods.Items {
-			if pod.Status.Phase == apiv1.PodPending {
-				podsCompleted = false
-			}
-		}
-
-		if podsCompleted == false {
-			fmt.Printf("Waiting for pods to run...\n")
+		replicationController, err = clientset.CoreV1().ReplicationControllers(options.Namespace).Get(context.TODO(), "kubernetes-performance-saturate", metav1.GetOptions{})
+		if replicationController.Status.AvailableReplicas != replicas {
+			fmt.Printf("Waiting for replicas to be running...\n")
 			time.Sleep(5 * time.Second)
 		} else {
 			break
 		}
 	}
 
-	selector := fields.Set{
-		"involvedObject.kind": "Pod",
-		"source":              apiv1.DefaultSchedulerName,
-	}.AsSelector().String()
+	startTime := replicationController.GetCreationTimestamp().Time
 
-	schedEvents, err := clientset.CoreV1().Events(options.Namespace).List(context.TODO(), metav1.ListOptions{FieldSelector: selector})
+	pods, err := clientset.CoreV1().Pods(options.Namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		panic(err.Error())
 	}
 
-	fmt.Printf("Found %d events", len(schedEvents.Items))
+	readyTimes := make([]float64, len(pods.Items))
+
+	for i, pod := range pods.Items {
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == apiv1.PodReady {
+				readyTimes[i] = condition.LastTransitionTime.Time.Sub(startTime).Seconds()
+			}
+		}
+	}
+
+	data, _ := json.Marshal(readyTimes)
+
+	_ = ioutil.WriteFile("pod-startup-times.json", data, 0644)
 
 	if options.Cleanup {
-		for i := 1; i <= len(nodes)*options.Pods; i++ {
-			err := clientset.CoreV1().Pods(options.Namespace).Delete(context.TODO(), fmt.Sprintf("kubernetes-performance-saturate-%d", i), metav1.DeleteOptions{})
-			if err != nil {
-				panic(err.Error())
+		zero := int32(0)
+		replicationController.Spec.Replicas = &zero
+		_, err := clientset.CoreV1().ReplicationControllers(options.Namespace).Update(context.TODO(), replicationController, metav1.UpdateOptions{})
+		if err != nil {
+			panic(err.Error())
+		}
+
+		for {
+			replicationController, err = clientset.CoreV1().ReplicationControllers(options.Namespace).Get(context.TODO(), "kubernetes-performance-saturate", metav1.GetOptions{})
+			if replicationController.Status.AvailableReplicas != zero {
+				fmt.Printf("Waiting for replication controller scaled to zero...\n")
+				time.Sleep(5 * time.Second)
+			} else {
+				break
 			}
+		}
+
+		err = clientset.CoreV1().ReplicationControllers(options.Namespace).Delete(context.TODO(), "kubernetes-performance-saturate", metav1.DeleteOptions{})
+		if err != nil {
+			panic(err.Error())
 		}
 	}
 }
