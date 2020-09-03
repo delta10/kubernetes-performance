@@ -30,6 +30,7 @@ var options struct {
 	KubeConfig   string `long:"kube-config" env:"KUBECONFIG" default:"" description:"The location of the Kubernetes configuration"`
 	Cleanup      bool   `long:"cleanup" default:"false" description:"Cleanup pods after run"`
 	Pvc          bool   `long:"pvc" default:"false" description:"Claim a persistent volume and mount to the pods"`
+	EmptyDir     bool   `long:"empty-dir" default:"false" description:"Claim an empty dir and mount to the pods"`
 	StorageClass string `long:"storage-class" default:"standard" description:"Persistent volume storage class"`
 
 	Command string `long:"command" default:"" description:"Run a specific benchmark command"`
@@ -177,6 +178,24 @@ func runCommandDistributed(clientset *kubernetes.Clientset, nodes []string) {
 			}
 		}
 
+		if options.EmptyDir {
+			pod.Spec.Containers[0].VolumeMounts = []apiv1.VolumeMount{
+				{
+					Name:      "emptydir",
+					MountPath: "/emptydir",
+				},
+			}
+
+			pod.Spec.Volumes = []apiv1.Volume{
+				{
+					Name: "emptydir",
+					VolumeSource: apiv1.VolumeSource{
+						EmptyDir: &apiv1.EmptyDirVolumeSource{},
+					},
+				},
+			}
+		}
+
 		_, err := clientset.CoreV1().Pods(options.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			panic(err.Error())
@@ -308,8 +327,6 @@ func saturateCluster(clientset *kubernetes.Clientset) {
 		}
 	}
 
-	startTime := replicationController.GetCreationTimestamp().Time
-
 	pods, err := clientset.CoreV1().Pods(options.Namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		panic(err.Error())
@@ -320,7 +337,7 @@ func saturateCluster(clientset *kubernetes.Clientset) {
 	for i, pod := range pods.Items {
 		for _, condition := range pod.Status.Conditions {
 			if condition.Type == apiv1.PodReady {
-				readyTimes[i] = condition.LastTransitionTime.Time.Sub(startTime).Seconds()
+				readyTimes[i] = condition.LastTransitionTime.Time.Sub(pod.CreationTimestamp.Time).Seconds()
 			}
 		}
 	}
