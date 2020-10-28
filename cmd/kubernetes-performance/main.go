@@ -27,9 +27,6 @@ var options struct {
 	Nodes      string
 	Namespace  string
 	KubeConfig string
-
-	Network     bool   `long:"network" default:"false" description:"Load test network"`
-	NetworkTime string `long:"network-time" default:"60" description:"Time of network load test"`
 }
 
 var (
@@ -62,8 +59,8 @@ func main() {
 	})
 
 	app.Command("saturate", "Saturate the cluster with pods to benchmark control plane", cmdSaturate)
-	app.Command("run", "Run benchmark command on all nodes", cmdRun)
-	app.Command("network", "Run iperf3 on two nodes to benchmark network connection", cmdNetwork)
+	app.Command("run", "Run benchmark command (sysbench or fio) on all nodes", cmdRun)
+	app.Command("network", "Run iperf3 on first two nodes to benchmark network connection", cmdNetwork)
 
 	app.Before = func() {
 		config, err := clientcmd.BuildConfigFromFlags("", options.KubeConfig)
@@ -377,6 +374,10 @@ func cmdRun(cmd *cli.Cmd) {
 }
 
 func cmdNetwork(cmd *cli.Cmd) {
+	var (
+		testTime = cmd.IntOpt("time", 30, "Time to run the test in seconds")
+	)
+
 	cmd.Action = func() {
 		if len(selectedNodes) < 2 {
 			fmt.Printf("Cannot perform network load test. Require a minimum of two nodes.")
@@ -431,7 +432,7 @@ func cmdNetwork(cmd *cli.Cmd) {
 					{
 						Name:    "kubernetes-performance",
 						Image:   "registry.gitlab.com/delta10/kubernetes-performance:latest",
-						Command: []string{"iperf3", "-c", serverPod.Status.PodIP, "-t", options.NetworkTime},
+						Command: []string{"iperf3", "-c", serverPod.Status.PodIP, "-t", string(*testTime)},
 					},
 				},
 				RestartPolicy: apiv1.RestartPolicyNever,
