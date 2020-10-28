@@ -36,6 +36,8 @@ var (
 )
 
 func main() {
+	fmt.Printf("Kubernetes Performance - Copyright © Delta10 B.V. 2020 - Licensed under the EUPL v1.2.\n\n")
+
 	app := cli.App("kubernetes-performance", "Run performance tests on a Kubernetes cluster")
 
 	app.StringPtr(&options.Nodes, cli.StringOpt{
