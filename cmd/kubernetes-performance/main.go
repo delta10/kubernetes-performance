@@ -114,7 +114,7 @@ func cmdSaturate(cmd *cli.Cmd) {
 		fmt.Printf("Saturating cluster...\n")
 
 		determinedReplicas := int32(*replicas)
-		userGuid := int64(1000)
+		userGUID := int64(1000)
 
 		replicationController := &apiv1.ReplicationController{
 			ObjectMeta: metav1.ObjectMeta{
@@ -140,7 +140,7 @@ func cmdSaturate(cmd *cli.Cmd) {
 							},
 						},
 						SecurityContext: &apiv1.PodSecurityContext{
-							RunAsUser: &userGuid,
+							RunAsUser: &userGUID,
 						},
 					},
 				},
