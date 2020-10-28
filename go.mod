@@ -4,6 +4,7 @@ go 1.15
 
 require (
 	github.com/imdario/mergo v0.3.11 // indirect
+	github.com/jawher/mow.cli v1.2.0
 	github.com/svent/go-flags v0.0.0-20141123140740-4bcbad344f03
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a // indirect
 	golang.org/x/net v0.0.0-20200822124328-c89045814202 // indirect
