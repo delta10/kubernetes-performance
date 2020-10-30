@@ -34,7 +34,9 @@ Run the tests with:
 $ kubernetes-performance saturate --replicas 10
 ```
 
-The pod startup times are reported in pod-startup-times.json. To determine the API-responsiveness make sure Prometheus is pre-installed on the cluster. Use the following Prometheus query to determine the responsiveness, grouped by request type:
+The pod startup times are reported in pod-startup-times.json.
+
+To determine the API-responsiveness make sure Prometheus is pre-installed on the cluster. Use the following Prometheus query to determine the responsiveness, grouped by request type:
 
 ```
 histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{verb!="WATCH", subresource!="proxy"}[1m]))  by (verb, scope, le))
