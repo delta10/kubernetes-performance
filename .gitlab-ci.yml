@@ -2,7 +2,7 @@ stages:
   - Build
   - Deploy
 
-Build:
+Build Docker image:
   stage: Build
   image: docker:19.03.12
   services:
@@ -14,6 +14,29 @@ Build:
   script:
     - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA .
     - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+
+Build CLI:
+  stage: Build
+  image: golang:1.14-alpine
+  variables:
+    GOARCH: amd64
+  before_script:
+    - source ./.gitlab/ci/functions.sh
+    - apk add --no-cache git zip
+  script:
+    - |
+        for GOOS in darwin linux windows
+        do
+          start_section "build_$GOOS" "Build and zip kubernetes-performance-$GOOS-$GOARCH"
+          GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=0 go build -ldflags "-w -s" -o kubernetes-performance-$GOOS-$GOARCH cmd/kubernetes-performance/main.go
+          zip kubernetes-performance-$GOOS-$GOARCH.zip kubernetes-performance-$GOOS-$GOARCH
+          stop_section "build_$GOOS" "Build and zip kubernetes-performance-$GOOS-$GOARCH"
+        done
+  artifacts:
+    paths:
+      - kubernetes-performance-darwin-amd64.zip
+      - kubernetes-performance-linux-amd64.zip
+      - kubernetes-performance-windows-amd64.zip
 
 Deploy Docker latest tag:
   stage: Deploy
@@ -30,3 +53,4 @@ Deploy Docker latest tag:
     - docker push $CI_REGISTRY_IMAGE:latest
   only:
     - master
+
