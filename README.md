@@ -5,9 +5,23 @@ This tool can be used to measure a Kubernetes cluster for performance. It provid
 - Control plane: measure API-responsiveness and pod startup time.
 - Workers: measure performance of CPU, memory, network, local disks and persistent volumes.
 
-Download the latest release from the [Releases page](https://gitlab.com/delta10/kubernetes-performance/-/releases).
+## Install
 
-## Control plane
+Download the latest release from the [Releases page](https://gitlab.com/delta10/kubernetes-performance/-/releases). Then unpack it:
+
+```bash
+$ unzip kubernetes-performance-v1.0-darwin-amd64.zip
+```
+
+Find the unpacked binary and move it to its desired destination:
+
+```bash
+$ mv kubernetes-performance-darwin-amd64 /usr/local/bin/kubernetes-performance
+```
+
+Now you should be able to run kubernetes-performance.
+
+## Measure control plane
 
 The control plane performance is measured by saturating the cluster with pods and measuring the pod startup time. The number of pods is specified with `--replicas`. This can be used to determine if a cluster adheres to the [SLA as specified by the Kubernetes project](https://kubernetes.io/blog/2015/09/kubernetes-performance-measurements-and/):
 
@@ -26,7 +40,7 @@ The pod startup times are reported in pod-startup-times.json. To determine the A
 histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{verb!="WATCH", subresource!="proxy"}[1m]))  by (verb, scope, le))
 ```
 
-## Workers
+## Measure workers
 
 The performance of the workers is measured by scheduling a pod per worker and run [sysbench](https://github.com/akopytov/sysbench), [fio](https://fio.readthedocs.io/) and [iperf3](https://iperf.fr/) on the worker. Then the logs are collected and reported locally in *.log.
 
