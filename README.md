@@ -1,6 +1,6 @@
 # Kubernetes performance
 
-This tool can be used to measure a Kubernetes cluster for performance. It provides features to measure the following metrics:
+This tool can be used to measure the performance of a Kubernetes cluster. It provides features to measure the following metrics:
 
 - Control plane: measure API-responsiveness and pod startup time.
 - Workers: measure performance of CPU, memory, network, local disks and persistent volumes.
