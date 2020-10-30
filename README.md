@@ -5,6 +5,8 @@ This tool can be used to measure a Kubernetes cluster for performance. It provid
 - Control plane: measure API-responsiveness and pod startup time.
 - Workers: measure performance of CPU, memory, network, local disks and persistent volumes.
 
+Download the latest release from the [Releases page](https://gitlab.com/delta10/kubernetes-performance/-/releases).
+
 ## Control plane
 
 The control plane performance is measured by saturating the cluster with pods and measuring the pod startup time. The number of pods is specified with `--replicas`. This can be used to determine if a cluster adheres to the [SLA as specified by the Kubernetes project](https://kubernetes.io/blog/2015/09/kubernetes-performance-measurements-and/):
