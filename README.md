@@ -26,7 +26,7 @@ histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{verb
 
 ## Workers
 
-The performance of the workers is measured by scheduling a pod per worker and run [sysbench](https://github.com/akopytov/sysbench), [fio](https://fio.readthedocs.io/) and [iperf3](https://fio.readthedocs.io/) on the worker. Then the logs are collected and reported locally in *.log.
+The performance of the workers is measured by scheduling a pod per worker and run [sysbench](https://github.com/akopytov/sysbench), [fio](https://fio.readthedocs.io/) and [iperf3](https://iperf.fr/) on the worker. Then the logs are collected and reported locally in *.log.
 
 ### CPU
 
