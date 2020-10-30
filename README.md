@@ -52,7 +52,7 @@ The performance of disks can be measured both for local storage and persistent v
 kubernetes-performance run "fio --name=randrw --rw=randrw --direct=1 --ioengine=libaio --bs=4k --iodepth=256 --numjobs=4 --size=1G --runtime=30 --group_reporting --filename=/emptydir/test" --create-empty-dir
 ```
 
-To benchmark a persistent volume, the tool provides the ability to claim a [persistent volume]([persistent volume claim](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reserving-a-persistentvolume)) of a specific storage class. For example to test the performance of a persistent volume from the storage class faster use:
+To benchmark a persistent volume, the tool provides the ability to claim a [persistent volume](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reserving-a-persistentvolume) of a specific storage class. For example to test the performance of a persistent volume from the storage class faster use:
 
 ```bash
 kubernetes-performance run "fio --name=randrw --rw=randrw --direct=1 --ioengine=libaio --bs=4k --iodepth=256 --numjobs=4 --size=512Mi --runtime=30 --group_reporting --filename=/pvc/test" --claim-pvc --storage-class=faster
