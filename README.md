@@ -1,31 +1,44 @@
 # Kubernetes performance
 
-This repository contains tools to perform benchmarks on Kubernetes clusters.
+This tool can be used to measure a Kubernetes cluster for performance. It provides features to measure the following metrics:
 
 - Control plane: measure API-responsiveness and pod startup time.
 - Workers: measure performance of CPU, memory, network, local disks and persistent volumes.
 
 ## Control plane
 
-To measure the control plane performance run:
+The control plane performance is measured by saturating the cluster with pods and measuring the pod startup time. The number of pods is specified with `--replicas`. This can be used to define if a cluster adheres to the [SLA as specified by the Kubernetes project](https://kubernetes.io/blog/2015/09/kubernetes-performance-measurements-and/):
+
+1. "API-responsiveness": 99% of all our API calls return in less than 1 second
+2. "Pod startup time": 99% of pods (with pre-pulled images) start within 5 seconds
+
+Run the tests with:
 
 ```bash
 kubernetes-performance saturate --replicas 10
 ```
 
+The pod startup times are reported in pod-startup-times.json. To determine the API-responsiveness you need to have Prometheus pre-installed on the cluster. Use the following Prometheus query to determine the responsiveness grouped by request type:
+
+```
+histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{verb!="WATCH", subresource!="proxy"}[1m]))  by (verb, scope, le))
+```
+
 ## Workers
 
-```bash
-docker build -t benchmark -f benchmark/Dockerfile .
-```
+The performance of the workers is measured by scheduling a pod per worker and run [sysbench](https://github.com/akopytov/sysbench), [fio](https://fio.readthedocs.io/) and [iperf3](https://fio.readthedocs.io/) on the worker. Then the logs are collected and reported locally in *.log.
 
 ### CPU
 
+Run a CPU benchmark with the following command:
+
 ```bash
-kubernetes-performance run "sysbench cpu run --time=30 --threads=4"
+kubernetes-performance run "sysbench cpu run --time=10 --threads=4"
 ```
 
 ### Memory
+
+Run a memory benchmark with the following command:
 
 ```bash
 kubernetes-performance run "sysbench memory run --memory-block-size=1M --memory-total-size=4G --threads=4"
@@ -33,15 +46,27 @@ kubernetes-performance run "sysbench memory run --memory-block-size=1M --memory-
 
 ### Disk
 
+The performance of disks can be measured both for local storage and persistent volumes. To test the performance of an [emptyDir](https://kubernetes.io/docs/concepts/storage/volumes/#emptydir) use:
+
 ```bash
-kubernetes-performance run "fio --name=randrw --rw=randrw --direct=1 --ioengine=libaio --bs=4k --iodepth=256 --numjobs=4 --size=1G --runtime=30 --group_reporting --filename=/tmp/test"
+kubernetes-performance run "fio --name=randrw --rw=randrw --direct=1 --ioengine=libaio --bs=4k --iodepth=256 --numjobs=4 --size=1G --runtime=30 --group_reporting --filename=/emptydir/test" --create-empty-dir
+```
+
+To benchmark a persistent volume, the tool provides the ability to claim a [persistent volume]([persistent volume claim](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reserving-a-persistentvolume)) of a specific storage class. For example to test the performance of a persistent volume from the storage class faster use:
+
+```bash
+kubernetes-performance run "fio --name=randrw --rw=randrw --direct=1 --ioengine=libaio --bs=4k --iodepth=256 --numjobs=4 --size=512Mi --runtime=30 --group_reporting --filename=/pvc/test" --claim-pvc --storage-class=faster
 ```
 
 ### Network
 
+To benchmark the performance of a cluster a minimum of two nodes are required. The tool wil schedule a iperf3 server on the first node and a iperf3 client on the second node. Run a benchmark with:
+
 ```bash
 kubernetes-performance network
 ```
+
+Reports of both the server and client are reported in *.log.
 
 ## Contributing
 

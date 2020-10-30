@@ -209,13 +209,13 @@ func cmdSaturate(cmd *cli.Cmd) {
 
 func cmdRun(cmd *cli.Cmd) {
 	var (
-		claimPvc       = cmd.BoolOpt("claim-pvc", false, "Claim a persistent volume")
+		claimPvc       = cmd.BoolOpt("claim-pvc", false, "Claim a persistent volume and mount on /pvc")
 		createEmptyDir = cmd.BoolOpt("create-empty-dir", false, "Create an empty dir on /emptydir")
 		storageClass   = cmd.StringOpt("storage-class", "standard", "The name of the storage class")
 		command        = cmd.StringArg("COMMAND", "", "The command that is run")
 	)
 
-	cmd.Spec = "[OPTIONS] [COMMAND]"
+	cmd.Spec = "[OPTIONS] [COMMAND] [OPTIONS]"
 
 	cmd.Action = func() {
 		for _, node := range selectedNodes {
@@ -434,7 +434,7 @@ func cmdNetwork(cmd *cli.Cmd) {
 					{
 						Name:    "kubernetes-performance",
 						Image:   "registry.gitlab.com/delta10/kubernetes-performance:latest",
-						Command: []string{"iperf3", "-c", serverPod.Status.PodIP, "-t", string(*testTime)},
+						Command: []string{"iperf3", "-c", serverPod.Status.PodIP, "-t", fmt.Sprintf("%d", *testTime)},
 					},
 				},
 				RestartPolicy: apiv1.RestartPolicyNever,
