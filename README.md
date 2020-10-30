@@ -7,7 +7,7 @@ This tool can be used to measure a Kubernetes cluster for performance. It provid
 
 ## Install
 
-Download the latest release from the [Releases page](https://gitlab.com/delta10/kubernetes-performance/-/releases). Then unpack it:
+Download the latest release from the [releases page](https://gitlab.com/delta10/kubernetes-performance/-/releases). Then unpack it:
 
 ```bash
 $ unzip kubernetes-performance-v1.0-darwin-amd64.zip
