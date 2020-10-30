@@ -7,7 +7,7 @@ This tool can be used to measure a Kubernetes cluster for performance. It provid
 
 ## Control plane
 
-The control plane performance is measured by saturating the cluster with pods and measuring the pod startup time. The number of pods is specified with `--replicas`. This can be used to define if a cluster adheres to the [SLA as specified by the Kubernetes project](https://kubernetes.io/blog/2015/09/kubernetes-performance-measurements-and/):
+The control plane performance is measured by saturating the cluster with pods and measuring the pod startup time. The number of pods is specified with `--replicas`. This can be used to determine if a cluster adheres to the [SLA as specified by the Kubernetes project](https://kubernetes.io/blog/2015/09/kubernetes-performance-measurements-and/):
 
 1. "API-responsiveness": 99% of all our API calls return in less than 1 second
 2. "Pod startup time": 99% of pods (with pre-pulled images) start within 5 seconds
