@@ -15,7 +15,7 @@ The control plane performance is measured by saturating the cluster with pods an
 Run the tests with:
 
 ```bash
-kubernetes-performance saturate --replicas 10
+$ kubernetes-performance saturate --replicas 10
 ```
 
 The pod startup times are reported in pod-startup-times.json. To determine the API-responsiveness you need to have Prometheus pre-installed on the cluster. Use the following Prometheus query to determine the responsiveness grouped by request type:
@@ -33,7 +33,7 @@ The performance of the workers is measured by scheduling a pod per worker and ru
 Run a CPU benchmark with the following command:
 
 ```bash
-kubernetes-performance run "sysbench cpu run --time=10 --threads=4"
+$ kubernetes-performance run "sysbench cpu run --time=10 --threads=4"
 ```
 
 ### Memory
@@ -41,7 +41,7 @@ kubernetes-performance run "sysbench cpu run --time=10 --threads=4"
 Run a memory benchmark with the following command:
 
 ```bash
-kubernetes-performance run "sysbench memory run --memory-block-size=1M --memory-total-size=4G --threads=4"
+$ kubernetes-performance run "sysbench memory run --memory-block-size=1M --memory-total-size=4G --threads=4"
 ```
 
 ### Disk
@@ -49,13 +49,13 @@ kubernetes-performance run "sysbench memory run --memory-block-size=1M --memory-
 The performance of disks can be measured both for local storage and persistent volumes. To test the performance of an [emptyDir](https://kubernetes.io/docs/concepts/storage/volumes/#emptydir) use:
 
 ```bash
-kubernetes-performance run "fio --name=randrw --rw=randrw --direct=1 --ioengine=libaio --bs=4k --iodepth=256 --numjobs=4 --size=1G --runtime=30 --group_reporting --filename=/emptydir/test" --create-empty-dir
+$ kubernetes-performance run "fio --name=randrw --rw=randrw --direct=1 --ioengine=libaio --bs=4k --iodepth=256 --numjobs=4 --size=1G --runtime=30 --group_reporting --filename=/emptydir/test" --create-empty-dir
 ```
 
 To benchmark a persistent volume, the tool provides the ability to claim a [persistent volume](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reserving-a-persistentvolume) of a specific storage class. For example to test the performance of a persistent volume from the storage class faster use:
 
 ```bash
-kubernetes-performance run "fio --name=randrw --rw=randrw --direct=1 --ioengine=libaio --bs=4k --iodepth=256 --numjobs=4 --size=512Mi --runtime=30 --group_reporting --filename=/pvc/test" --claim-pvc --storage-class=faster
+$ kubernetes-performance run "fio --name=randrw --rw=randrw --direct=1 --ioengine=libaio --bs=4k --iodepth=256 --numjobs=4 --size=512Mi --runtime=30 --group_reporting --filename=/pvc/test" --claim-pvc --storage-class=faster
 ```
 
 ### Network
@@ -63,7 +63,7 @@ kubernetes-performance run "fio --name=randrw --rw=randrw --direct=1 --ioengine=
 To benchmark the performance of a cluster a minimum of two nodes are required. The tool wil schedule a iperf3 server on the first node and a iperf3 client on the second node. Run a benchmark with:
 
 ```bash
-kubernetes-performance network
+$ kubernetes-performance network
 ```
 
 Reports of both the server and client are reported in *.log.
