@@ -75,7 +75,8 @@ func main() {
 			panic(err.Error())
 		}
 
-		nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+		//Only select worker nodes for performance tests
+		nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: "node-role.kubernetes.io/worker=true"})
 		if err != nil {
 			panic(err.Error())
 		}
