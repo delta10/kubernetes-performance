@@ -17,7 +17,7 @@ Build Docker image:
 
 Build CLI:
   stage: Build
-  image: golang:1.16-alpine
+  image: golang:1.17-alpine
   variables:
     GOARCH: amd64
   before_script:
