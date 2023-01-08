@@ -1,6 +1,6 @@
 module gitlab.com/delta10/kubernetes-performance
 
-go 1.15
+go 1.19
 
 require (
 	github.com/imdario/mergo v0.3.11 // indirect
